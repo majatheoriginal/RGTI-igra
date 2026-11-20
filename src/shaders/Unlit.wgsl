@@ -16,6 +16,7 @@ struct SkinnedVertexInput {
 struct VertexOutput {
    @builtin(position) position: vec4f, 
    @location(0) uv: vec2f,
+   @location(1) normal: vec3f,
 }
 
 struct Camera {
@@ -35,13 +36,10 @@ struct Model {
 @group(3) @binding(0) var<storage, read> jointMatrices: array<mat4x4f>;
 
 @vertex
-fn vertex(input:VertexInput) -> VertexOutput {
+fn vertex(input: VertexInput) -> VertexOutput {
     let position = camera.projection * camera.view * model.matrix * vec4f(input.position, 1.0);
-
-    var output: VertexOutput;
-    output.position = position;
-    output.uv = input.uv;
-    return output;
+    let normal = (model.matrix * vec4f(input.normal, 0.0)).xyz;
+    return VertexOutput(position, input.uv, normal);
 }
 
 @vertex
@@ -52,13 +50,22 @@ fn vertexSkinned(input: SkinnedVertexInput) -> VertexOutput {
         input.weights.z * jointMatrices[input.joints.z] +
         input.weights.w * jointMatrices[input.joints.w];
 
-    var output: VertexOutput;
-    output.position = camera.projection * camera.view * model.matrix * skin * vec4f(input.position, 1.0);
-    output.uv = input.uv;
-    return output;
+    let world = model.matrix * skin;
+    let position = camera.projection * camera.view * world * vec4f(input.position, 1.0);
+    let normal = (world * vec4f(input.normal, 0.0)).xyz;
+    return VertexOutput(position, input.uv, normal);
 }
 
 @fragment
 fn fragment(input: VertexOutput) -> @location(0) vec4f {
-    return textureSample(baseTexture, textureSampler, input.uv);
+    let tex = textureSample(baseTexture, textureSampler, input.uv);
+
+    // Simple fake lighting so walls, floor and ceiling look different.
+    // abs() because the normals may point inward or outward.
+    var shade = 1.0;
+    if (length(input.normal) > 0.001) {
+        let sun = normalize(vec3f(0.4, 1.0, 0.6));
+        shade = 0.45 + 0.55 * abs(dot(normalize(input.normal), sun));
+    }
+    return vec4f(tex.rgb * shade, tex.a);
 }
