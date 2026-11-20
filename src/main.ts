@@ -11,6 +11,7 @@ import { Transform, TransformType } from "./components/Transform.ts";
 import { Entity } from "./Entity.ts";
 import { FirstPersonController } from "./FirstPersonController.ts";
 import { createPlane } from "./createPlane.ts";
+import { Game } from "./Game.ts";
 import { createTempTexture } from "./Utils.ts";
 
 
@@ -42,6 +43,26 @@ roomTransform.scale = vec3.fromValues(ROOM_SCALE, ROOM_SCALE, ROOM_SCALE);
 const groundImage = await createTempTexture(vec4.fromValues(0.5, 0.5, 0.5, 1));
 // 60x60 plane, slightly above the room's own floor
 scene.addEntity(createPlane(60, groundImage, 1, 0.02));
+
+// ŽLICA
+
+// naloži model žlice v ločen parser
+const spoonParser = new GLTFParser();
+spoonParser.setJson(await fetch("data/spoon.gltf").then((r) => r.text()), "data/");
+const spoonScene = await spoonParser.parseScene(0);
+if (!spoonScene) throw Error("Could not load the spoon!");
+
+// vse entitete žlice dodaj v glavno sceno
+for (const e of spoonScene.entities) {
+    scene.addEntity(e);
+}
+
+// koren (glavna entiteta brez starša) je tisti, ki ga premikaš in skrivaš
+const spoon = spoonScene.entities.find((e) => e.parent === null)!;
+const spoonTransform = spoon.getComponent(Transform)!;
+spoonTransform.location = vec3.fromValues(1.85, 0.25, 0.55);
+spoonTransform.scale = vec3.fromValues(0.1, 0.1, 0.1);   // velikost 
+
 
 
 // ------ Player camera (first person: the camera IS the player) ------ //
@@ -79,6 +100,9 @@ const renderState = new RenderState(gpuDevice, canvas);
 // Controller: WASD + mouse (click the canvas first, Esc to release)
 const controller = new FirstPersonController(playerCamera, canvas);
 controller.moveSpeed = 1.5;   // the room is small, so walk slower
+
+// Spoon, dig spot and key (see Game.ts). Must be created BEFORE createBuffers.
+const game = new Game()
 
 
 // ------ Create and write all buffers ------ //
@@ -132,6 +156,7 @@ function update(timestamp: number) {
     lastTime = timestamp;
 
     controller.update(dt);
+    game.update(dt);
 
     computeTransforms(scene);
     updateBuffers(renderState, scene);

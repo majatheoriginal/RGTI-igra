@@ -10,6 +10,9 @@ export class FirstPersonController {
 
     private keys = new Set<string>();
     private transform: Transform;
+    private normalHeight = 1.6
+    private crouchHeight  = 0.9
+
 
     constructor(cameraEntity: Entity, canvas: HTMLCanvasElement) {
         const t = cameraEntity.getComponent(Transform);
@@ -44,10 +47,22 @@ export class FirstPersonController {
         if (this.keys.has("KeyA")) vec3.sub(dir, dir, right);
 
         const pos = vec3.clone(this.transform.location);
+        //premikanje
         if (vec3.length(dir) > 0) {
             vec3.normalize(dir, dir);
             vec3.scaleAndAdd(pos, pos, dir, this.moveSpeed * dt);
         }
+
+        //počep
+        let targetHeight = this.normalHeight;
+
+        if (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight")) {
+            targetHeight = this.crouchHeight;
+        }
+        //da se smoothly spremeni pozicija
+        pos[1] += (targetHeight - pos[1]) * Math.min(dt * 8, 1);
+
+
 
         // Rotation = yaw around Y, then pitch around X
         const qYaw = quat.setAxisAngle(quat.create(), [0, 1, 0], this.yaw);
