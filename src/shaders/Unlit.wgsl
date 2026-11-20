@@ -13,7 +13,6 @@ struct SkinnedVertexInput {
     @location(4) joints: vec4u,
     @location(5) weights: vec4f
 }
-
 struct VertexOutput {
    @builtin(position) position: vec4f, 
    @location(0) uv: vec2f,
