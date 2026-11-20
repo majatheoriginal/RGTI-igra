@@ -51,18 +51,23 @@ const spoonParser = new GLTFParser();
 spoonParser.setJson(await fetch("data/spoon.gltf").then((r) => r.text()), "data/");
 const spoonScene = await spoonParser.parseScene(0);
 if (!spoonScene) throw Error("Could not load the spoon!");
-
-// vse entitete žlice dodaj v glavno sceno
 for (const e of spoonScene.entities) {
     scene.addEntity(e);
 }
-
-// koren (glavna entiteta brez starša) je tisti, ki ga premikaš in skrivaš
 const spoon = spoonScene.entities.find((e) => e.parent === null)!;
 const spoonTransform = spoon.getComponent(Transform)!;
 spoonTransform.location = vec3.fromValues(1.85, 0.25, 0.55);
 spoonTransform.scale = vec3.fromValues(0.1, 0.1, 0.1);   // velikost 
 
+//SPOON interaction
+let spoonPickup = false;
+let interactPressed = false;
+
+window.addEventListener("keydown", (e) => {
+    if (e.code === "KeyE" && !e.repeat){
+        interactPressed = true
+    }
+})
 
 
 // ------ Player camera (first person: the camera IS the player) ------ //
@@ -157,6 +162,21 @@ function update(timestamp: number) {
 
     controller.update(dt);
     game.update(dt);
+
+    if (interactPressed && !spoonPickup){  //preveri če smo pritisnili E  && preveri da žliča še ni pobrana 
+        const playerPosition = playerCamera.getComponent(Transform)!.location;  //pridobi lokacijo kamere
+        const spoonPosition = spoon.getComponent(Transform)!.location;  //in žlice
+        const distance = vec3.distance(playerPosition, spoonPosition);  //izračuna razdaljo
+        console.log("Distance to spoon:", distance);
+
+        if (distance < 2.0) {  //če smo dost blizu
+            spoonPickup = true;
+            console.log("Spoon picked up!");
+        }
+    }
+
+
+
 
     computeTransforms(scene);
     updateBuffers(renderState, scene);
