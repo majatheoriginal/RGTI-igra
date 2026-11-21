@@ -179,7 +179,7 @@ function update(timestamp: number) {
         console.log("Distance:", distance);
         console.log("Looking:", lookingAtSpoon);
 
-       if (distance < 2.0 && lookingAtSpoon > 0.8) { //če so dovolj blitu in če gledamo ovolj proti žlici
+       if (distance < 0.8 && lookingAtSpoon > 0.8) { //če so dovolj blitu in če gledamo ovolj proti žlici
             spoonPickup = true; //je dvignjena.
             console.log("Spoon picked up!");
             }
@@ -213,10 +213,9 @@ function update(timestamp: number) {
             spoonPosition[1] -= 0.4  //damo jo še malo bolj dol
             spoon.getComponent(Transform)!.location = spoonPosition
                 //dostopamo do komponente- Transform ki ma podatje o location, rotation , scale... vzamemo lcoation(! je zato da trdimo da obstaja- če ne da napako)
-                //spoonPosition je pa nova pozicija ki je bla zračunana in tko NASTAVIMO POZICIJO ŽLICE NA TO NOVO IZRAČUNANO POZICIJO
-            interactPressed = false  //to se da v true ko pritisnimo E, zato po koncu protiska to damo stran.
-          
+                //spoonPosition je pa nova pozicija ki je bla zračunana in tko NASTAVIMO POZICIJO ŽLICE NA TO NOVO IZRAČUNANO POZICIJO          
             }
+            interactPressed = false  //to se da v true ko pritisnimo E, zato po koncu protiska to damo stran.
 
 
 
