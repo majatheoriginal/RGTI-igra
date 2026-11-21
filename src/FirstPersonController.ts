@@ -3,9 +3,9 @@ import { Transform } from "./components/Transform.ts";
 import type { Entity } from "./Entity.ts";
 
 export class FirstPersonController {
-    yaw = 0;                 // left/right look angle (radians)
-    pitch = 0;               // up/down look angle (radians)
-    moveSpeed = 5;           // units per second
+    yaw = 0;                 // levo / desno
+    pitch = 0;               // gor/doll
+    moveSpeed = 5;           // kolk hitro
     mouseSensitivity = 0.002;
 
     private keys = new Set<string>();
