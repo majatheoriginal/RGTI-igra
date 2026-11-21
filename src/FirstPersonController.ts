@@ -8,6 +8,11 @@ export class FirstPersonController {
     moveSpeed = 5;           // units per second
     mouseSensitivity = 0.002;
 
+    eyeHeight = 1.5;      // višina oči = višina "tal"
+    jumpSpeed = 4;        //  hitrost skoka 
+    gravity = 9;          // pospešek navzdol (== gravitacija)
+    private velocityY = 0;
+
     private keys = new Set<string>();
     private transform: Transform;
 
@@ -31,7 +36,7 @@ export class FirstPersonController {
         });
     }
 
-    update(dt: number) {
+    update(dt: number) { //dt: delta time cas ki je minil od prejsnje slike
         const sin = Math.sin(this.yaw);
         const cos = Math.cos(this.yaw);
         const forward = vec3.fromValues(-sin, 0, -cos);  // flat, ignores looking up/down
@@ -43,11 +48,33 @@ export class FirstPersonController {
         if (this.keys.has("KeyD")) vec3.add(dir, dir, right);
         if (this.keys.has("KeyA")) vec3.sub(dir, dir, right);
 
-        const pos = vec3.clone(this.transform.location);
+
+        const pos = vec3.clone(this.transform.location);  // pos[0] = levo/desno pos[1] = gor/dol pos[2] = naprej / nazaj
+
+        /*Ko skočiš, ji daš pozitivno vrednost (jumpSpeed), torej greš navzgor pos[1]
+        Vsako sličico težnost hitrost zmanjša .
+        Hitrost sčasoma pade na 0 (vrh skoka) in postane negativna, zato začneš padati.
+        Višino spremeniš glede na hitrost.
+        */
+
         if (vec3.length(dir) > 0) {
             vec3.normalize(dir, dir);
             vec3.scaleAndAdd(pos, pos, dir, this.moveSpeed * dt);
         }
+
+        const OnGround = pos[0] <= this.eyeHeight;
+        if(OnGround && this.keys.has("Space")){
+            this.velocityY = this.jumpSpeed;
+        }
+        this.velocityY -= this.gravity * dt;
+        pos[1] += this.velocityY * dt;
+
+        if (pos[1] <= this.eyeHeight){
+            pos[1] = this.eyeHeight;
+            this.velocityY = 0;
+        }
+
+        
 
         // Rotation = yaw around Y, then pitch around X
         const qYaw = quat.setAxisAngle(quat.create(), [0, 1, 0], this.yaw);
