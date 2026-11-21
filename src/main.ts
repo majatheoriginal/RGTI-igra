@@ -1,4 +1,4 @@
-import { vec3, vec4 } from "gl-matrix";
+import { quat, vec3, vec4 } from "gl-matrix";
 import { RenderState } from "./RenderState.ts";
 import { updateBuffers } from "./systems/BufferUpdateSystem.ts";
 import { prepareRendering } from "./systems/PrepareRenderSystem.ts";
@@ -11,6 +11,7 @@ import { Transform, TransformType } from "./components/Transform.ts";
 import { Entity } from "./Entity.ts";
 import { FirstPersonController } from "./FirstPersonController.ts";
 import { createPlane } from "./createPlane.ts";
+import { Game } from "./Game.ts";
 import { createTempTexture } from "./Utils.ts";
 
 
@@ -42,6 +43,31 @@ roomTransform.scale = vec3.fromValues(ROOM_SCALE, ROOM_SCALE, ROOM_SCALE);
 const groundImage = await createTempTexture(vec4.fromValues(0.5, 0.5, 0.5, 1));
 // 60x60 plane, slightly above the room's own floor
 scene.addEntity(createPlane(60, groundImage, 1, 0.02));
+
+// ŽLICA
+
+// naloži model žlice v ločen parser
+const spoonParser = new GLTFParser();
+spoonParser.setJson(await fetch("data/spoon.gltf").then((r) => r.text()), "data/");
+const spoonScene = await spoonParser.parseScene(0);
+if (!spoonScene) throw Error("Could not load the spoon!");
+for (const e of spoonScene.entities) {
+    scene.addEntity(e);
+}
+const spoon = spoonScene.entities.find((e) => e.parent === null)!;
+const spoonTransform = spoon.getComponent(Transform)!;
+spoonTransform.location = vec3.fromValues(1.85, 0.25, 0.55);
+spoonTransform.scale = vec3.fromValues(0.1, 0.1, 0.1);   // velikost 
+
+//SPOON interaction
+let spoonPickup = false;
+let interactPressed = false;
+
+window.addEventListener("keydown", (e) => {
+    if (e.code === "KeyE" && !e.repeat){
+        interactPressed = true
+    }
+})
 
 
 // ------ Player camera (first person: the camera IS the player) ------ //
@@ -79,6 +105,9 @@ const renderState = new RenderState(gpuDevice, canvas);
 // Controller: WASD + mouse (click the canvas first, Esc to release)
 const controller = new FirstPersonController(playerCamera, canvas);
 controller.moveSpeed = 1.5;   // the room is small, so walk slower
+
+// Spoon, dig spot and key (see Game.ts). Must be created BEFORE createBuffers.
+const game = new Game()
 
 
 // ------ Create and write all buffers ------ //
@@ -132,6 +161,66 @@ function update(timestamp: number) {
     lastTime = timestamp;
 
     controller.update(dt);
+    game.update(dt);
+
+// --- ŽLICA --- //
+    if (interactPressed && !spoonPickup){  //preveri če smo pritisnili E  && preveri da žliča še ni pobrana 
+        const playerPosition = playerCamera.getComponent(Transform)!.location;  //pridobi lokacijo kamere
+        const spoonPosition = spoon.getComponent(Transform)!.location;  //in žlice
+        const distance = vec3.distance(playerPosition, spoonPosition);  //izračuna razdaljo
+        const forward = vec3.fromValues(-Math.sin(controller.yaw), 0, -Math.cos(controller.yaw))  //izračuna v kero sme rigralec gleda... glede na yaw ki je obračanje levo in desno
+        //izračunamo smer od igralca proti žlici...
+        const directionToSpoon = vec3.create();
+        vec3.subtract(directionToSpoon, spoonPosition, playerPosition);
+        directionToSpoon[1] = 0  //ignorriamo višinsko razlko
+        vec3.normalize(directionToSpoon, directionToSpoon);  //v nroamliziran vektor
+
+        const lookingAtSpoon = vec3.dot(forward, directionToSpoon); //dot product.. a gledata v enako smer
+        console.log("Distance:", distance);
+        console.log("Looking:", lookingAtSpoon);
+
+       if (distance < 0.8 && lookingAtSpoon > 0.8) { //če so dovolj blitu in če gledamo ovolj proti žlici
+            spoonPickup = true; //je dvignjena.
+            console.log("Spoon picked up!");
+            }
+        }
+        //zdaj moramo žlico pred igralca postavit...
+        if (spoonPickup){
+            const playerPosition = playerCamera.getComponent(Transform)!.location  //pogledamo trenutni položj playerja
+            const playerRotation = playerCamera.getComponent(Transform)!.rotation
+            const spoonTransform = spoon.getComponent(Transform)!;
+            spoonTransform.rotation = quat.clone(playerRotation);  //nardimo kopjo rotacije 
+
+
+            //spet pogledamo kam gleda.     //ko je yaw 0 je -math.sin(9) =0... in je forward =[0 ,0 -1].. to pomen da igralec gleda po negativni z osi... torej naprej
+            const forward = vec3.fromValues(-Math.sin(controller.yaw), 0, -Math.cos(controller.yaw))   //ko se obrne za 90 stopjinj je potem forwatd = [1 , 0, 0] kar pomeni da gleda proti pozitvni x osi....
+            //to računamo zato, da položaj žlice spreminjamo oz izračunamo po trenutni SMERI IGRALCA.. in ko se obrne se tudi vektor sprmenei...
+            
+            //hočemo da je žlica bolj an desni strani igralca.. da deluje ko da je v roki
+            const right = vec3.fromValues(Math.cos(controller.yaw), 0, -Math.sin(controller.yaw)) //izračuna DESNO od tega kamor je player.. torej npr kot smo prej rekli ko je yaw= 0 bi blo zdej kle [1 0 0] in gleda proti pozitivn  x osi(desno).. igralec pa proti negativni z osi(naprej)
+
+            const spoonPosition = vec3.clone(playerPosition) //kopirammo pozicijo igralca
+            const forwardOffset = vec3.fromValues( forward[0] * 0.3 , forward[1] * 0.3, forward[2] * 0.3)  //nov vektor v smeri forward sam za pol rajši... //npr [ 0 0 -0.5]
+            spoonPosition[0] += forwardOffset[0]
+            spoonPosition[1] += forwardOffset[1]       //pozicijo žlice (najrpej pozicija playerja)            //to je pol spoonposition je za 0 desno od playera, za 0 levo in za 0.5 bolj blizu
+            spoonPosition[2] += forwardOffset[2]       // smo premaknili za 
+
+            const rightOffset = vec3.fromValues(right[0] * 0.25, right[1] * 0.25, right[2] * 0.25)  //enako kot prej samo da za ta vketor ki gleda v desno
+            spoonPosition[0] += rightOffset[0]
+            spoonPosition[1] += rightOffset[1]          //žlico smo zdaj premaknili mal obolj v desno... odali npr [0.25 , 0 , 0]
+            spoonPosition[2] += rightOffset[2]
+
+            spoonPosition[1] -= 0.4  //damo jo še malo bolj dol
+            spoon.getComponent(Transform)!.location = spoonPosition
+                //dostopamo do komponente- Transform ki ma podatje o location, rotation , scale... vzamemo lcoation(! je zato da trdimo da obstaja- če ne da napako)
+                //spoonPosition je pa nova pozicija ki je bla zračunana in tko NASTAVIMO POZICIJO ŽLICE NA TO NOVO IZRAČUNANO POZICIJO          
+            }
+            interactPressed = false  //to se da v true ko pritisnimo E, zato po koncu protiska to damo stran.
+
+
+
+
+
 
     computeTransforms(scene);
     updateBuffers(renderState, scene);
